@@ -308,6 +308,38 @@ dsh plugin --profile web add /tmp/runzhliu-dsh-browser-desktop-0.1.6.tgz
 
 `0.1.6` 插件新增对 DSH `0.2.2` client module runtime 的兼容，同时保留 `0.1.2`、`0.2.0` 与 `0.2.1` 系列兼容；旧 DSH `0.1.0`/`0.1.1` RC 应继续使用插件 `0.1.1`。发布到 npm 后可直接执行 `dsh plugin --profile web add @runzhliu/dsh-browser-desktop`。该 npm 包只负责 Harness Host/WebUI 集成，不会自行安装 Chromium、Xvfb、noVNC 或官方 Browser Use provider；本仓库 Docker 镜像是完整的参考运行时。官方 DSH 通过 npm/GitHub 和 `dsh-plugin` GitHub topic 发现社区插件。
 
+### 预装 Superpowers 技能插件
+
+镜像预装社区 bundle [`superpowers-dsh`](https://github.com/LayneChai/superpowers-dsh) `0.5.0`，把 [obra/superpowers](https://github.com/obra/superpowers) 的 15 个工程方法技能（TDD、系统化调试、头脑风暴、计划编写与执行、代码评审、完成前验证等）注册到 DSH 的 **host** 技能注册表；每个 agent preset 的会话都能在技能目录中看到这些技能，并用 `skill` 工具加载。技能正文随包分发，插件没有第三方运行时依赖。
+
+它与浏览器插件不同，没有 Web 客户端模块，只影响 Host，也不需要额外网络访问。入口脚本在启动时为 web profile 建立包链接，镜像还会把包链接进 DSH 安装树的 `node_modules`，因此 `dsh --profile web --dump-config` 能看到 `superpowers-dsh` 行。默认启用；设置 `DSH_SUPERPOWERS_ENABLED=0` 可在不重建镜像的情况下关闭它（该行会被标记为 `disabled`）。
+
+这是第三方社区插件，不是 DeepSeek 官方组件，本项目不为其技能内容背书。版本由构建参数 `DSH_SUPERPOWERS_VERSION` 固定，升级前应先核对其与当前 DSH 的兼容性说明。验证：
+
+```bash
+docker run --rm <image> web --patch /opt/deepseek-harness/web.cordis.patch.yml --dump-config | grep superpowers-dsh
+```
+
+Compose 会透传 `DSH_SUPERPOWERS_ENABLED`，可在 `.env` 中设为 `0`。可选市场镜像和 Super Agent 镜像都从默认镜像派生，技能集合与默认镜像一致。
+
+该包已预装并注册，通常不需要再对同一 profile 执行 `dsh plugin add superpowers-dsh`，也不要在 profile 里重复声明同名 bundle；需要换版本时使用构建参数重建镜像。
+
+### 预装 IM 网关插件
+
+镜像预装社区 bundle [`@lijian-ui/dsh-im-gateway`](https://github.com/lijian-ui/dsh-im-gateway) `0.3.5`，把会话接到钉钉、QQ、个人微信（官方 iLink）、飞书 / Lark 与企业微信。接入后具备：设置页「IM 通道」（扫码绑定、状态四态、重连 / 测试）、流式回复与长回复分片、工具审批桥（在聊天里回「批准 / 拒绝」）、`ask_user_question` 同步到聊天、多段输入合并，以及 `im_send_file` 工具。凭据存在 `~/.dsh/settings.yaml` 的 `im-gateway.channels`，在设置页保存后热重载，无需重启。
+
+它带第三方运行时依赖（`qrcode`、`ws` 与平台 SDK），整棵依赖树装进镜像；导入的 `@deepseek-ai/*` 仍取自 DSH 安装树，由镜像内符号链接提供。入口脚本在首次启动时幂等地把 `im-gateway` 行写进 web profile 的 `cordis.patch.yml`（而不是命令行 `--patch` overlay），并把包链接进 DSH 安装树的 `node_modules`，所以 `dsh --profile web --dump-config` 能看到 `im-gateway` 行。该行不能由 `--patch` 或 home patch 插入，否则更高优先级层会覆盖它，设置页「IM 通道」保存时就会报 `Configuration for "im-gateway" is overridden by a home patch or command-line overlay`。设置 `DSH_IM_GATEWAY_ENABLED=0` 可在不重建镜像的情况下禁用该行。
+
+固定 `@lijian-ui` 分支而不是同名上游包是有意的：上游 `dsh-im-gateway@0.3.3` 声明的 `@deepseek-ai/dsh-*` peer 是 `^0.1.0-rc.6`（即 `<0.2.0-0`），会被 DSH `0.2.2-rc.3` 的兼容性闸门拒绝；本分支声明 `>=0.1.0 <0.3.0-0`。版本由构建参数 `DSH_IM_GATEWAY_VERSION` 固定，换版本前先核对其 peer 范围是否覆盖当前 DSH。
+
+这是第三方社区插件，不是 DeepSeek 官方组件，本项目不对其代码与渠道行为背书。验证：
+
+```bash
+docker run --rm <image> web --patch /opt/deepseek-harness/web.cordis.patch.yml --dump-config | grep im-gateway
+```
+
+Compose 会透传 `DSH_IM_GATEWAY_ENABLED`，可在 `.env` 中设为 `0`。可选市场镜像和 Super Agent 镜像都从默认镜像派生，插件集合与默认镜像一致。该包已预装并注册，通常不需要再执行 `dsh plugin add @lijian-ui/dsh-im-gateway`，也不要在 profile 里重复声明同名 bundle。
+
 ### 可选的 Super Agent 预装镜像
 
 镜像 `runzhliu/deepseek-harness:0.2.2-rc.3-r1-superagent.1` 在插件市场版基础上预装 [DeepSeek Super Agent 原型](https://github.com/deepseek-ai/dsh-superagent-prototype) `0.1.0`，固定源码提交 [`6337fc8`](https://github.com/deepseek-ai/dsh-superagent-prototype/commit/6337fc823ce20251c8de8085948165c81aaa701e)。包含 GitHub CLI `2.103.3`、tmux 和 Git LFS；同名双架构镜像同时提供于 Docker Hub / GHCR。
@@ -548,7 +580,7 @@ docker compose exec deepseek-harness node -e "console.log(require('node:os').hom
 | `Dockerfile` | 固定版本的非 root DSH 运行时，默认启动 Web UI |
 | `Dockerfile.market` | 从默认镜像派生、固定第三方市场版本的可选镜像 |
 | `Dockerfile.bwrap` | 为缺少 Landlock 的 Docker 主机提供 bubblewrap 的可选派生镜像 |
-| `web.cordis.patch.yml` | 回环 Web 监听与官方 Browser Use / 浏览器桌面集成 |
+| `web.cordis.patch.yml` | 回环 Web 监听、官方 Browser Use / 浏览器桌面与 Superpowers 技能集成 |
 | `scripts/dsh-web-relay.cjs` | 单个具体容器 IP 到 DSH 回环监听的原始 TCP 中继 |
 | `compose.yaml` | 持久化、回环端口和收紧后的运行时配置 |
 | `compose.market.yaml` | 显式选择第三方社区市场镜像的可选 Compose overlay |

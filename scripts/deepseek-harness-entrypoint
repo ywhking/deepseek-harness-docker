@@ -47,6 +47,47 @@ install_browser_plugins() {
     'official Playwright Browser Use provider'
 }
 
+install_superpowers_plugin() {
+  install_profile_package_link \
+    "${DSH_HOME}/profiles/web/node_modules/superpowers-dsh" \
+    /opt/deepseek-harness/plugins/superpowers-dsh \
+    'superpowers plugin'
+}
+
+install_im_gateway_plugin() {
+  install_profile_package_link \
+    "${DSH_HOME}/profiles/web/node_modules/@lijian-ui/dsh-im-gateway" \
+    /opt/deepseek-harness/plugins/dsh-im-gateway/node_modules/@lijian-ui/dsh-im-gateway \
+    'IM gateway plugin'
+}
+
+# The IM gateway is configured per instance from the Web settings page, so its
+# row must live in the profile's own patch layer, not in the --patch overlay on
+# the command line: a home patch or --patch overlay would win over the profile
+# patch and make the row read-only ("Configuration for ... is overridden by a
+# home patch or command-line overlay"). Write the row once, idempotently, before
+# dsh initializes the profile; a profile that already carries the row is left
+# untouched, and DSH_IM_GATEWAY_ENABLED=0 still disables it without a rebuild.
+install_im_gateway_profile_patch() {
+  profile_patch="${DSH_HOME}/profiles/web/cordis.patch.yml"
+  mkdir -p "$(dirname "${profile_patch}")"
+  if grep -F -q "name: '@lijian-ui/dsh-im-gateway'" "${profile_patch}" 2>/dev/null; then
+    return 0
+  fi
+  # A freshly initialized profile starts with an empty `[]` sequence; drop that
+  # line so the appended entry keeps the file a valid top-level YAML sequence.
+  if [ -f "${profile_patch}" ]; then
+    sed -i '/^\[\][[:space:]]*$/d' "${profile_patch}"
+  fi
+  cat >> "${profile_patch}" <<'PATCH'
+
+- insert:
+    - id: im-gateway
+      name: '@lijian-ui/dsh-im-gateway'
+      disabled: !!js process.env.DSH_IM_GATEWAY_ENABLED === '0'
+PATCH
+}
+
 stop_children() {
   trap - INT TERM HUP
   if [ -n "${dsh_pid}" ]; then
@@ -177,6 +218,9 @@ start_desktop() {
 trap handle_signal INT TERM HUP
 
 install_browser_plugins
+install_superpowers_plugin
+install_im_gateway_plugin
+install_im_gateway_profile_patch
 
 is_web=0
 if [ "${1:-}" = web ] || { [ "${1:-}" = --profile ] && [ "${2:-}" = web ]; }; then

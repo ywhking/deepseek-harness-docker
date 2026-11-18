@@ -40,6 +40,31 @@ if [[ "${browser_use_versions}" != "${expected_version}"$'\n'"${expected_version
   exit 1
 fi
 
+superpowers_skill_count="$(docker run --rm --entrypoint node "${image}" --input-type=module -e '
+  const mod = await import("/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/superpowers-dsh/lib/index.js")
+  let provider
+  mod.apply({ skills: { registerProvider: (factory) => { provider = factory({}) } } })
+  const skills = await provider.list({})
+  if (!skills.some((skill) => skill.name === "using-superpowers")) process.exit(1)
+  process.stdout.write(String(skills.length))
+')"
+if [[ "${superpowers_skill_count}" != 15 ]]; then
+  echo "expected 15 Superpowers skills from superpowers-dsh, got ${superpowers_skill_count:-none}" >&2
+  exit 1
+fi
+
+im_gateway_version="$(docker run --rm --entrypoint node "${image}" -p '
+  require("/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@lijian-ui/dsh-im-gateway/package.json").version
+')"
+im_gateway_label="$(docker image inspect --format '{{ index .Config.Labels "io.github.runzhliu.deepseek-harness.im-gateway.version" }}' "${image}")"
+if [[ -z "${im_gateway_version}" || "${im_gateway_version}" != "${im_gateway_label}" ]]; then
+  echo "preinstalled IM gateway ${im_gateway_version:-missing} does not match image label ${im_gateway_label:-missing}" >&2
+  exit 1
+fi
+docker run --rm --entrypoint node "${image}" --input-type=module -e '
+  await import("/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@lijian-ui/dsh-im-gateway/lib/index.js")
+'
+
 actual_node_version="$(docker run --rm --entrypoint node "${image}" --version)"
 if [[ "${actual_node_version}" != v24.* ]]; then
   echo "expected Node.js 24.x from the upstream image, got ${actual_node_version}" >&2
@@ -118,6 +143,14 @@ if [[ "${config}" != *"name: '@deepseek-ai/dsh-browser-use'"* ]] \
     || [[ "${config}" != *"mode: attach"* ]] \
     || [[ "${config}" != *"endpoint: http://127.0.0.1:9222"* ]]; then
   echo "container Web patch did not attach official Playwright Browser Use to Chromium" >&2
+  exit 1
+fi
+if [[ "${config}" != *"name: superpowers-dsh"* ]]; then
+  echo "container Web patch did not load the preinstalled Superpowers bundle" >&2
+  exit 1
+fi
+if [[ "${config}" != *"name: '@lijian-ui/dsh-im-gateway'"* ]]; then
+  echo "profile patch did not load the preinstalled IM gateway bundle" >&2
   exit 1
 fi
 if [[ -n "${expected_market_version}" ]]; then
@@ -238,6 +271,18 @@ for attempt in $(seq 1 30); do
     if ! curl --fail --silent --cookie "${cookie_jar}" "http://127.0.0.1:${port}/" \
       | grep --quiet '"id":"@runzhliu/dsh-browser-desktop"'; then
       echo "Harness boot manifest did not include the browser desktop client plugin" >&2
+      exit 1
+    fi
+    if ! docker exec "${container}" node -e '
+      const fs = require("node:fs")
+      const profilePatch = `${process.env.DSH_HOME}/profiles/web/cordis.patch.yml`
+      const overlay = "/opt/deepseek-harness/web.cordis.patch.yml"
+      if (!fs.readFileSync(profilePatch, "utf8").includes("id: im-gateway"))
+        throw new Error("IM gateway row is missing from the profile patch")
+      if (fs.readFileSync(overlay, "utf8").includes("id: im-gateway"))
+        throw new Error("IM gateway row must not be in the --patch overlay")
+    '; then
+      echo "IM gateway must be configurable from the profile patch, not the --patch overlay" >&2
       exit 1
     fi
     if ! docker exec "${container}" node -e '

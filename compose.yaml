@@ -4,9 +4,13 @@ services:
       context: .
       args:
         DSH_VERSION: ${DSH_VERSION:-0.2.2-rc.3}
+        DSH_SUPERPOWERS_VERSION: ${DSH_SUPERPOWERS_VERSION:-0.5.0}
+        DSH_IM_GATEWAY_VERSION: ${DSH_IM_GATEWAY_VERSION:-0.3.5}
         IMAGE_VERSION: ${DSH_IMAGE_VERSION:-0.2.2-rc.3-r1}
         NODE_IMAGE: ${NODE_IMAGE:-docker.io/library/node:24-trixie}
         PNPM_VERSION: ${PNPM_VERSION:-10.15.1}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-deb.debian.org}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     image: ${DSH_IMAGE_REPOSITORY:-docker.io/runzhliu/deepseek-harness}:${DSH_IMAGE_VERSION:-0.2.2-rc.3-r1}
     container_name: ${DSH_LAN_USERNAME}-dsh
     ports:
@@ -16,6 +20,8 @@ services:
       DSH_TELEMETRY_DISABLED: "1"
       DSH_DESKTOP_ENABLED: "1"
       DSH_BROWSER_USE_ENABLED: ${DSH_BROWSER_USE_ENABLED:-1}
+      DSH_SUPERPOWERS_ENABLED: ${DSH_SUPERPOWERS_ENABLED:-1}
+      DSH_IM_GATEWAY_ENABLED: ${DSH_IM_GATEWAY_ENABLED:-1}
       DSH_WEB_RELAY_INTERFACE: ${DSH_WEB_RELAY_INTERFACE:-}
       DSH_DESKTOP_PUBLIC_PORT: ${DSH_DESKTOP_PORT:-6080}
       HOME: /workspace

@@ -19,6 +19,11 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Preinstall the community `superpowers-dsh@0.5.0` bundle in the default image, registering 15 Superpowers engineering-method skills on the host skill registry; `DSH_SUPERPOWERS_ENABLED=0` disables it at runtime. Market and Super Agent images inherit the plugin.
+- Preinstall the community `@lijian-ui/dsh-im-gateway@0.3.5` bundle so a session can be driven from DingTalk, QQ, personal WeChat, Feishu/Lark and WeCom with a settings page, remote approvals and interactive questions. The `@lijian-ui` fork is pinned because upstream `dsh-im-gateway@0.3.3` declares `@deepseek-ai/dsh-*` peers below `0.2.0`; `DSH_IM_GATEWAY_VERSION` pins the version and `DSH_IM_GATEWAY_ENABLED=0` removes the plugin row without a rebuild.
+- Move the `im-gateway` row out of the `--patch` overlay into the web profile's `cordis.patch.yml`, written idempotently by the entrypoint on first startup, so the **IM 通道** settings page can save configuration instead of failing with `Configuration for "im-gateway" is overridden by a home patch or command-line overlay`.
+- Speed up image builds: `DEBIAN_MIRROR` and `NPM_REGISTRY` build arguments repoint apt and npm at a closer mirror (defaults unchanged), apt/npm downloads use BuildKit cache mounts, Chromium is installed in its own layer so tool-list edits no longer re-fetch the browser, and `make build` / Compose forward both arguments.
+
 ## 0.1.28 - 2026-11-03
 
 - Upgrade DSH and matching official Browser Use packages to `0.2.2-alpha.3`, with fresh immutable container revisions.

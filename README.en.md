@@ -309,6 +309,38 @@ dsh plugin --profile web add /tmp/runzhliu-dsh-browser-desktop-0.1.6.tgz
 
 Plugin `0.1.6` adds compatibility with the DSH `0.2.2` client-module runtime while retaining `0.1.2`, `0.2.0` and `0.2.1` compatibility; older DSH `0.1.0`/`0.1.1` release candidates should keep using plugin `0.1.1`. After npm publication, install it with `dsh plugin --profile web add @runzhliu/dsh-browser-desktop`. The npm package supplies only the Harness host/Web integration; it does not install Chromium, Xvfb, noVNC, or an official Browser Use provider. This repository's image is the complete reference runtime. Official DSH discovers community plugins through npm/GitHub and the `dsh-plugin` GitHub topic.
 
+### Preinstalled Superpowers skills
+
+The image bundles the community [`superpowers-dsh`](https://github.com/LayneChai/superpowers-dsh) `0.5.0` plugin, which registers 15 engineering-methodology skills ported from [obra/superpowers](https://github.com/obra/superpowers) (TDD, systematic debugging, brainstorming, writing and executing plans, code review, verification before completion) on DSH's **host** skill registry. Every agent preset sees them in the skill catalog and can load them with the `skill` tool. Skill bodies ship inside the package, and the plugin has no third-party runtime dependencies.
+
+Unlike the browser plugin it has no Web client module: it only affects the Host and needs no extra network access. The entrypoint links the package into the web profile at startup, and the image also links it into the DSH installation's `node_modules`, so `dsh --profile web --dump-config` shows the `superpowers-dsh` row. It is enabled by default; set `DSH_SUPERPOWERS_ENABLED=0` to disable it without rebuilding the image (the row is then marked `disabled`).
+
+This is a third-party community plugin, not an official DeepSeek component, and this project does not endorse its skill content. The version is pinned by the `DSH_SUPERPOWERS_VERSION` build argument; check its DSH compatibility notes before upgrading. Verify with:
+
+```bash
+docker run --rm <image> web --patch /opt/deepseek-harness/web.cordis.patch.yml --dump-config | grep superpowers-dsh
+```
+
+Compose forwards `DSH_SUPERPOWERS_ENABLED`, so setting it to `0` in `.env` disables the plugin. The optional market and Super Agent images derive from the default image and expose the same skill set.
+
+Because the bundle is already preinstalled and registered, you normally do not need to run `dsh plugin add superpowers-dsh` for the same profile, and should not declare a duplicate bundle row. Rebuild with a different build argument to change versions.
+
+### Preinstalled IM gateway
+
+The image bundles the community [`@lijian-ui/dsh-im-gateway`](https://github.com/lijian-ui/dsh-im-gateway) `0.3.5` plugin, which connects a session to DingTalk, QQ, personal WeChat (official iLink), Feishu/Lark and WeCom. It brings an **IM 通道** settings page with QR binding, four-state channel status and reconnect/test actions; streaming replies with long-message splitting; a tool-approval bridge (reply `批准` / `拒绝` in the chat); mirroring of `ask_user_question` into the chat; multi-part input merging; and an `im_send_file` tool. Credentials live in `~/.dsh/settings.yaml` under `im-gateway.channels` and hot-reload after saving in the settings page, so no restart is needed.
+
+Unlike Superpowers it has third-party runtime dependencies (`qrcode`, `ws` and the official platform SDKs), so its whole dependency tree ships inside the image; the `@deepseek-ai/*` peers it imports still come from the DSH installation through symlinks created in the runtime stage. On first startup the entrypoint idempotently writes the `im-gateway` row into the web profile's `cordis.patch.yml` (rather than the command-line `--patch` overlay) and links the package into the DSH installation's `node_modules`, so `dsh --profile web --dump-config` shows the `im-gateway` row. The row must not be inserted by `--patch` or a home patch, or that higher-priority layer overrides it and saving the **IM 通道** settings fails with `Configuration for "im-gateway" is overridden by a home patch or command-line overlay`. It is enabled by default; set `DSH_IM_GATEWAY_ENABLED=0` to remove the row without rebuilding the image (the package stays installed).
+
+The `@lijian-ui` fork is pinned deliberately: upstream `dsh-im-gateway@0.3.3` declares `@deepseek-ai/dsh-*` peers of `^0.1.0-rc.6` (that is, `<0.2.0-0`), which the DSH `0.2.2-rc.3` compatibility gate rejects, while this fork declares `>=0.1.0 <0.3.0-0`. The version is pinned by the `DSH_IM_GATEWAY_VERSION` build argument; check that a new version's peer range covers the current DSH before bumping it.
+
+This is a third-party community plugin, not an official DeepSeek component, and this project does not endorse its code or channel behaviour. Verify with:
+
+```bash
+docker run --rm <image> web --patch /opt/deepseek-harness/web.cordis.patch.yml --dump-config | grep im-gateway
+```
+
+Compose forwards `DSH_IM_GATEWAY_ENABLED`, so setting it to `0` in `.env` disables the plugin. The optional market and Super Agent images derive from the default image and expose the same plugin set. Because the bundle is already preinstalled and registered, you normally do not need to run `dsh plugin add @lijian-ui/dsh-im-gateway` for the same profile, and should not declare a duplicate bundle row.
+
 ### Optional preinstalled Super Agent image
 
 `runzhliu/deepseek-harness:0.2.2-rc.3-r1-superagent.1` extends the market image with the [DeepSeek Super Agent prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) `0.1.0`, pinned to commit [`6337fc8`](https://github.com/deepseek-ai/dsh-superagent-prototype/commit/6337fc823ce20251c8de8085948165c81aaa701e). It includes GitHub CLI `2.103.3`, tmux and Git LFS, with matching amd64/arm64 images on Docker Hub and GHCR.
@@ -413,6 +445,44 @@ docker run --rm \
 ```
 
 The foreground command prints the tokenized startup URL; open that exact URL. Do not shorten the publication to `-p 3080:3080`, and do not place this service behind a public Ingress: this configuration does not enable Web TLS, and noVNC on 6080 has no authentication.
+
+### Build performance
+
+The first build spends nearly all of its wall clock downloading: the Debian
+toolchain, `fonts-noto-cjk` (about 57 MB) and Chromium all come from
+`deb.debian.org`, and the isolated plugin trees come from npm. Two build
+arguments repoint those downloads without changing any default:
+
+```bash
+docker build \
+  --build-arg DEBIAN_MIRROR=mirrors.aliyun.com \
+  --build-arg NPM_REGISTRY=https://registry.npmmirror.com \
+  -t runzhliu/deepseek-harness:0.2.2-rc.3-r1 .
+```
+
+- `DEBIAN_MIRROR` replaces the `deb.debian.org` host in
+  `/etc/apt/sources.list.d/debian.sources` (a bare host defaults to HTTPS; a
+  full `http(s)://` URL is honored as-is). Debian mirrors such as
+  `mirrors.aliyun.com`, `mirrors.tuna.tsinghua.edu.cn` and
+  `mirrors.ustc.edu.cn` carry the `trixie` suite this image needs.
+- `NPM_REGISTRY` is passed to the three `npm install` calls in the installer
+  stage; it defaults to `https://registry.npmjs.org/`.
+
+`make build` forwards `DEBIAN_MIRROR` and `NPM_REGISTRY`, and Compose reads the
+same names from `.env`, so `docker compose build` inherits the mirror too.
+
+Beyond mirrors, the Dockerfile keeps downloads out of repeated builds: apt
+archives and npm tarballs live in BuildKit cache mounts, Chromium and the Noto
+CJK fonts share one layer (editing the CLI tool list no longer re-fetches the
+browser or the fonts, and a rebuild installs from the cached `.deb`), and the
+three isolated plugin trees resolve in parallel inside a single layer. noVNC's
+static files are unpacked from the Debian archive instead of installing the
+`novnc` package, which would otherwise pull in the Debian `nodejs` runtime.
+This needs BuildKit, which Docker 23 and later enable by default; on older
+engines export `DOCKER_BUILDKIT=1`.
+Pulling the `node:24-trixie` base image (~370 MB) is a registry round trip of
+its own, so a registry mirror or a `NODE_IMAGE` pointing at a local mirror of
+the same tag helps the very first build.
 
 ## Headless mode
 
@@ -549,7 +619,7 @@ The last command must print `/workspace`. An `EACCES` under `/workspace` instead
 | `Dockerfile` | Pinned, non-root DSH runtime with Web as the default command |
 | `Dockerfile.market` | Optional derivative that pins a third-party market version on top of the default image |
 | `Dockerfile.bwrap` | Optional bubblewrap derivative for Docker hosts that cannot enforce Landlock |
-| `web.cordis.patch.yml` | Loopback Web listener and official Browser Use / browser-desktop integration |
+| `web.cordis.patch.yml` | Loopback Web listener, official Browser Use / browser-desktop, and Superpowers skills |
 | `scripts/dsh-web-relay.cjs` | Raw TCP relay from one concrete container IP to DSH loopback |
 | `compose.yaml` | Persistent, loopback-only, hardened local deployment |
 | `compose.market.yaml` | Optional Compose overlay that explicitly selects the third-party community market image |

@@ -39,6 +39,22 @@ awk '
     next
   }
 
+  /^### 预装 Superpowers 技能插件$/ {
+    compact = 1
+    print
+    print "默认镜像预装社区 `superpowers-dsh` 技能包；`DSH_SUPERPOWERS_ENABLED=0` 可关闭。"
+    print ""
+    next
+  }
+
+  /^### 预装 IM 网关插件$/ {
+    compact = 1
+    print
+    print "默认镜像预装社区 `@lijian-ui/dsh-im-gateway` IM 网关；`DSH_IM_GATEWAY_ENABLED=0` 可关闭。"
+    print ""
+    next
+  }
+
   /^### 可选的 Super Agent 预装镜像$/ {
     compact = 1
     superagent = 1

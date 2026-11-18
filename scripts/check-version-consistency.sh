@@ -13,6 +13,8 @@ ungoogled_amd64_sha256="${9:?missing ungoogled-chromium amd64 sha256}"
 ungoogled_arm64_sha256="${10:?missing ungoogled-chromium arm64 sha256}"
 bwrap_image_version="${11:?missing bubblewrap image version}"
 caddy_version="${12:?missing Caddy version}"
+superpowers_version="${13:?missing Superpowers plugin version}"
+im_gateway_version="${14:?missing IM gateway plugin version}"
 
 require_literal() {
   local file="$1"
@@ -24,6 +26,8 @@ require_literal() {
 }
 
 require_literal Dockerfile "ARG DSH_VERSION=${dsh_version}"
+require_literal Dockerfile "ARG DSH_SUPERPOWERS_VERSION=${superpowers_version}"
+require_literal Dockerfile "ARG DSH_IM_GATEWAY_VERSION=${im_gateway_version}"
 require_literal Dockerfile "ARG IMAGE_VERSION=${image_version}"
 require_literal Dockerfile "ARG PNPM_VERSION=${pnpm_version}"
 require_literal Dockerfile '"@deepseek-ai/dsh-browser-use@${DSH_VERSION}"'
@@ -109,6 +113,9 @@ require_literal plugins/dsh-browser-desktop/package.json "\"version\": \"${brows
 require_literal plugins/dsh-browser-desktop/package.json '"@deepseek-ai/dsh-client-modules"'
 require_literal web.cordis.patch.yml "name: '@deepseek-ai/dsh-browser-use'"
 require_literal web.cordis.patch.yml "name: '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp'"
+require_literal web.cordis.patch.yml "name: 'superpowers-dsh'"
+require_literal web.market.cordis.patch.yml "name: 'superpowers-dsh'"
+require_literal scripts/deepseek-harness-entrypoint "name: '@lijian-ui/dsh-im-gateway'"
 require_literal web.cordis.patch.yml "endpoint: 'http://127.0.0.1:9222'"
 require_literal README.md "runzhliu/deepseek-harness:${image_version}"
 require_literal README.md "--build-arg DSH_VERSION=${dsh_version}"
@@ -139,5 +146,5 @@ require_literal README.md 'compose.bwrap.yaml'
 require_literal README.en.md 'compose.bwrap.yaml'
 require_literal SKILL.md 'compose.bwrap.yaml'
 
-printf 'versions are consistent: image=%s dsh=%s pnpm=%s market=%s browser-plugin=%s ungoogled-chromium=%s bwrap=%s caddy=%s\n' \
-  "${image_version}" "${dsh_version}" "${pnpm_version}" "${market_version}" "${browser_plugin_version}" "${ungoogled_chromium_version}" "${bwrap_image_version}" "${caddy_version}"
+printf 'versions are consistent: image=%s dsh=%s pnpm=%s market=%s browser-plugin=%s superpowers=%s im-gateway=%s ungoogled-chromium=%s bwrap=%s caddy=%s\n' \
+  "${image_version}" "${dsh_version}" "${pnpm_version}" "${market_version}" "${browser_plugin_version}" "${superpowers_version}" "${im_gateway_version}" "${ungoogled_chromium_version}" "${bwrap_image_version}" "${caddy_version}"

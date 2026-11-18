@@ -22,6 +22,14 @@
         desktopPort: !!js Number(process.env.DSH_DESKTOP_PUBLIC_PORT ?? 6080)
         desktopPath: !!js "'/novnc-' + process.env.DSH_NOVNC_ASSET_REVISION + '/vnc.html?autoconnect=1&resize=scale&view_only=0&reconnect=1'"
 
+    # Community Superpowers bundle: TDD, systematic debugging, planning and code
+    # review skills registered on the host skill registry. Host-only; no Web
+    # client module. DSH_SUPERPOWERS_ENABLED=0 keeps the package installed but
+    # removes its skills without rebuilding the image.
+    - id: superpowers-dsh
+      name: 'superpowers-dsh'
+      disabled: !!js process.env.DSH_SUPERPOWERS_ENABLED === '0'
+
 - id: webserver
   name: '@deepseek-ai/dsh-host-webserver'
   config:
