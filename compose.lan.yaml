@@ -15,6 +15,7 @@ services:
 
   lan-gateway:
     image: ${CADDY_IMAGE:-docker.io/library/caddy:2.11.4-alpine}
+    container_name: ${DSH_LAN_USERNAME}-caddy
     depends_on:
       deepseek-harness:
         condition: service_healthy

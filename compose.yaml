@@ -8,6 +8,7 @@ services:
         NODE_IMAGE: ${NODE_IMAGE:-docker.io/library/node:24-trixie}
         PNPM_VERSION: ${PNPM_VERSION:-10.15.1}
     image: ${DSH_IMAGE_REPOSITORY:-docker.io/runzhliu/deepseek-harness}:${DSH_IMAGE_VERSION:-0.2.2-rc.3-r1}
+    container_name: ${DSH_LAN_USERNAME}-dsh
     ports:
       - "127.0.0.1:${DSH_PORT:-3080}:3080"
       - "127.0.0.1:${DSH_DESKTOP_PORT:-6080}:6080"
@@ -18,8 +19,9 @@ services:
       DSH_WEB_RELAY_INTERFACE: ${DSH_WEB_RELAY_INTERFACE:-}
       DSH_DESKTOP_PUBLIC_PORT: ${DSH_DESKTOP_PORT:-6080}
       HOME: /workspace
+    user: "${DSH_UID:-1000}:${DSH_GID:-${DSH_UID:-1000}}"
     volumes:
-      - dsh-home:/home/node/.dsh
+      - ${DSH_WORKSPACE:-dsh-workspace}/.dsh:/home/node/.dsh
       - ${DSH_WORKSPACE:-dsh-workspace}:/workspace
     read_only: true
     tmpfs:
@@ -27,6 +29,7 @@ services:
     # Chromium uses /dev/shm for renderer processes. This mirrors the useful
     # runtime setting from docker-antigravity without adopting its amd64-only
     # desktop base image.
+      - /home/node:rw,size=1m,mode=0755
     shm_size: "1gb"
     cap_drop:
       - ALL
